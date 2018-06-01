@@ -5,7 +5,8 @@ function viewModel() {
     self.videoDuration = 0;
     self.timer;
     self.cueOverflow = document.getElementById("cueOverflow");
-    self.cueList = document.getElementById("cueList")
+    self.cueList = document.getElementById("cueList");
+
     self.initPlayer = function () {
         var options = {
             id: self.videoID,
@@ -117,11 +118,14 @@ function viewModel() {
         deleteBTN.type = 'button';
         deleteBTN.value = "X";
         deleteBTN.setAttribute('for', dId);
+        deleteBTN.setAttribute('data-time', cueTime);
         deleteBTN.addEventListener('click', function (item) {
             if (confirm('Are you sure you want to remove cue?')) {
                 var cue = document.getElementById(this.attributes["for"].nodeValue);
+                var cueTime = this.attributes["data-time"].nodeValue
                 self.player.removeCuePoint(this.attributes["for"].nodeValue).then(function (id) {
                     cue.parentNode.removeChild(cue);
+                    removeLocalStorage(self.videoID,cueTime);
                 }).catch(function (error) {
                     switch (error.name) {
                         case 'InvalidCuePoint':
