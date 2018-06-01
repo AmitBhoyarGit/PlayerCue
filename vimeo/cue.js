@@ -27,15 +27,13 @@ function viewModel() {
         });
 
         self.player.on('cuepoint', function (cue) {
-            var duration = 2000;
+            var duration = parseInt(cue.data.CueDuration)*1000;
             var iframe = document.getElementsByTagName("iframe");
             var offset = iframe[0].offsetLeft;
             
             self.cueOverflow.innerHTML='';
             var p = document.createElement("p");
             p.innerHTML = cue.data.Description;
-            p.style.fontFamily = 'Arial, Helvetica, sans-serif';
-            p.style.fontSize = '23';
             self.cueOverflow.style.marginLeft = offset+'px';
             self.cueOverflow.appendChild(p);
             clearTimeout(self.timer);
@@ -70,16 +68,18 @@ function viewModel() {
     self.addQuePoint = function (data) {
         var cueDescription = document.getElementById("cueText");
         var cueTime = document.getElementById("cueTime");
-        var isValid = self.validateCuePoint(cueDescription.value);
-        if (isValid) {
-            self.player.pause();
+        var cueDuration = document.getElementById("cueDuration");
+        self.validateCuePoint(cueDescription.value,Math.round(cueTime.value),function(){
             self.player.addCuePoint(Math.round(cueTime.value), {
                 Description: cueDescription.value,
+                CueDuration:cueDuration.value?cueDuration.value : 2
             }).then(function (id) {
-                self.createDOMElement(cueDescription.value, Math.round(cueTime.value), id);
-                setLocalStorage(id,{vid:self.videoID, d:cueDescription.value, t:Math.round(cueTime.value)});
+                self.createDOMElement(cueDescription.value, Math.round(cueTime.value), id,cueDuration.value?cueDuration.value : 2);
+                setLocalStorage(id,{vid:self.videoID, d:cueDescription.value, t:Math.round(cueTime.value), dur:cueDuration.value?cueDuration.value : 2});
+                self.player.pause();
                 cueDescription.value = '';
                 cueTime.value = '';
+                cueDuration.value='';
             }).catch(function (error) {
                 switch (error.name) {
                     case 'UnsupportedError':
@@ -93,12 +93,11 @@ function viewModel() {
                         break;
                 }
             });
-
-        }
+        });
 
     }
 
-    self.createDOMElement = function (cueDescription, cueTime, id) {
+    self.createDOMElement = function (cueDescription, cueTime, id,cueDuration) {
         var dId = id;
         var queElement = document.createElement("div")
         queElement.className = 'cueItem';
@@ -142,20 +141,32 @@ function viewModel() {
         });
         cueDec.appendChild(deleteBTN);
 
+        s = document.createElement("small");
+        s.innerHTML = 'Duration: '+cueDuration +' sec';
+        cueDec.appendChild(s);
+
         queElement.appendChild(cueDec);
         self.cueList.appendChild(queElement);
     }
 
-    self.validateCuePoint = function (cueDescription, cuePoint, duration) {
+    self.validateCuePoint = function (cueDescription, cuePoint,resolve) {
         var res = false;
         res = cueDescription != '' ? true : false
         if (res) {
-
+            self.player.getCuePoints().then(function(cuePoints) {
+               for (let i = 0; i < cuePoints.length; i++) {
+                   if(cuePoints[i].time == cuePoint){
+                    alert("Cue point already added at this timestamp.");
+                    return false;   
+                   }
+               }
+               resolve();
+            });
         }
         else {
-            alert("Invalid cue point data.")
+            alert("Invalid cue point data.");
         }
-        return res;
+       
     }
 
     self.loadDataFromLocalSrorage = function(id){
@@ -165,8 +176,9 @@ function viewModel() {
             for (let i = 0; i < storeData.length; i++) {
                 self.player.addCuePoint(storeData[i].t, {
                     Description: storeData[i].d,
+                    CueDuration:storeData[i].dur?storeData[i].dur : 2
                 }).then(function(id) {
-                    self.createDOMElement(storeData[i].d,storeData[i].t,id);
+                    self.createDOMElement(storeData[i].d,storeData[i].t,id,storeData[i].dur);
                 }).catch(function(error) {
                     console.log(error);
                 });
@@ -182,8 +194,8 @@ function viewModel() {
 })();
 
 function toMinutes(seconds){
-    var m = Math.floor(seconds % 3600 / 60);
-    var s = Math.floor(seconds % 3600 % 60);
+    var m = Math.floor(seconds/ 60);
+    var s = Math.round(seconds - m * 60);
 
     var mDisplay = m > 0 ? m+':' : "00:";
     var sDisplay = s > 0 ? (s<10? "0"+s: s)  : "00";
@@ -201,19 +213,21 @@ function setLocalStorage(videoId,data){
 }
 
 function getLocalStorage(videoId){
+    store =[];
     try{
-        store =[];
         for ( var i = 0, len = localStorage.length; i < len; ++i ) {
             item = JSON.parse(localStorage.getItem(localStorage.key(i)));
             if(item.vid == videoId){
                 store.push(item);
             }
         }
+        store.sort(function(a, b){return a.t - b.t});
         return store;
     }
     catch(e){
-        return null;
+        console.log(e);
     }
+    return store;
 }
 
 function removeLocalStorage(videoId,t){
