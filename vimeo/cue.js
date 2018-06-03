@@ -11,7 +11,7 @@ function viewModel() {
         var options = {
             id: self.videoID,
             width: 640,
-            loop: true
+            loop: false
         };
         self.player = new Vimeo.Player('vimeo-videoPlayer', options);
 
@@ -24,6 +24,16 @@ function viewModel() {
         self.player.on('timeupdate', function (data) {
             var cueInput = document.getElementById("cueTime");
             cueInput.value = Math.round(data.seconds);
+        });
+
+        self.player.on('ended', function (data) {
+            clearTimeout(self.timer);
+            self.cueOverflow.innerHTML='';
+        });
+
+        self.player.on('seeked', function (data) {
+            clearTimeout(self.timer);
+            self.cueOverflow.innerHTML='';
         });
 
         self.player.on('cuepoint', function (cue) {
